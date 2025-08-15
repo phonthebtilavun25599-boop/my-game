@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Square Runner Game</title>
+  <title>game space run</title>
   <style>
     body { margin: 0; overflow: hidden; background: #eee; }
     canvas { display: block; margin: auto; background: #fff; border: 1px solid #ccc; }
@@ -15,7 +15,8 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-let player = { x: 50, y: 300, w: 30, h: 30, dy: 0, onGround: true };
+let groundHeight = 50; // ความสูงของพื้น
+let player = { x: 50, y: canvas.height - groundHeight - 30, w: 30, h: 30, dy: 0, onGround: true };
 let gravity = 0.8;
 let jumpPower = -12;
 let obstacles = [];
@@ -24,7 +25,7 @@ let speed = 5;
 
 function spawnObstacle() {
   let height = 20 + Math.random() * 50; // ความสูงต่างกัน
-  let yPos = canvas.height - height; // ให้อยู่ชิดพื้นเสมอ
+  let yPos = canvas.height - groundHeight - height; // ให้อยู่บนพื้น
   obstacles.push({
     x: canvas.width,
     y: yPos,
@@ -42,8 +43,8 @@ function update() {
   player.dy += gravity;
   player.y += player.dy;
 
-  if (player.y + player.h >= canvas.height) {
-    player.y = canvas.height - player.h;
+  if (player.y + player.h >= canvas.height - groundHeight) {
+    player.y = canvas.height - groundHeight - player.h;
     player.dy = 0;
     player.onGround = true;
   }
@@ -71,9 +72,15 @@ function update() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // วาดพื้น
+  ctx.fillStyle = '#888';
+  ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+
+  // วาดผู้เล่น
   ctx.fillStyle = 'red';
   ctx.fillRect(player.x, player.y, player.w, player.h);
 
+  // วาดสิ่งกีดขวาง
   ctx.fillStyle = 'green';
   obstacles.forEach(ob => {
     ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
