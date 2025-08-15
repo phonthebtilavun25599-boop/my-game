@@ -1,308 +1,99 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Square Runner — HTML5 Game</title>
-  <meta name="description" content="เกมวิ่งหลบสิ่งกีดขวาง เล่นได้ทั้งมือถือและคอม, พร้อมสำหรับ GitHub Pages" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Square Runner Game</title>
   <style>
-    :root {
-      --bg:#0f172a;        /* slate-900 */
-      --panel:#111827cc;   /* gray-900/80 */
-      --accent:#22d3ee;    /* cyan-400 */
-      --accent2:#a78bfa;   /* violet-400 */
-      --text:#e5e7eb;      /* gray-200 */
-      --muted:#94a3b8;     /* slate-400 */
-    }
-    html,body { height: 100%; }
-    body {
-      margin: 0; display:flex; align-items:center; justify-content:center;
-      background: radial-gradient(1200px 600px at 70% -10%, #1e293b, #0b1020 60%, #070b15 100%), var(--bg);
-      color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", "Noto Sans", Arial, sans-serif;
-      overflow: hidden;
-    }
-    #wrap { width:min(900px, 100vw); height:min(600px, 100vh); position:relative; }
-    canvas { width:100%; height:100%; display:block; background: linear-gradient(#0b1224, #0a0f1e 60%, #070c16);
-      border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.04);
-    }
-    .hud { position:absolute; inset:0; pointer-events:none; }
-    .score { position:absolute; left:16px; top:12px; font-weight:700; letter-spacing:.5px; text-shadow:0 0 10px rgba(34,211,238,.2); }
-    .speed { position:absolute; right:16px; top:12px; font-weight:600; color:var(--muted); }
-    .btnbar { position:absolute; left:50%; transform:translateX(-50%); bottom:16px; display:flex; gap:12px; pointer-events:auto; }
-    .btn { background:linear-gradient(180deg, #1f2937, #0f172a); color:var(--text); border:1px solid rgba(255,255,255,.08);
-      padding:10px 14px; border-radius:12px; font-weight:700; letter-spacing:.4px; cursor:pointer; user-select:none;
-      transition:.15s transform ease, .2s box-shadow ease; box-shadow: 0 6px 20px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.03);
-    }
-    .btn:hover { transform:translateY(-1px); box-shadow:0 12px 28px rgba(0,0,0,.4); }
-    .btn:active { transform:translateY(0); }
-    .center { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; text-align:center; }
-    .panel { background:linear-gradient(180deg, #0b1020, #0a0f1e); border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:20px 24px; box-shadow: 0 30px 80px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.02); }
-    h1 { margin: 0 0 8px; font-size: clamp(18px, 2.8vw, 28px); }
-    p { margin:8px 0; color:var(--muted); }
-    kbd { background:#111827; border:1px solid rgba(255,255,255,.08); padding:2px 6px; border-radius:6px; font-weight:700; }
-    .touchHint { display:none; }
-    @media (hover:none) and (pointer:coarse){ .touchHint { display:inline; } .keyHint { display:none; } }
+    body { margin: 0; overflow: hidden; background: #eee; }
+    canvas { display: block; margin: auto; background: #fff; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
-  <div id="wrap">
-    <canvas id="game" width="900" height="600" aria-label="Square Runner Canvas"></canvas>
+<canvas id="gameCanvas" width="800" height="400"></canvas>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-    <!-- HUD -->
-    <div class="hud">
-      <div class="score">คะแนน: <span id="score">0</span></div>
-      <div class="speed">ความเร็ว: <span id="speed">1.0x</span></div>
-      <div class="btnbar">
-        <button class="btn" id="btnJump">กระโดด</button>
-        <button class="btn" id="btnPause">พัก</button>
-        <button class="btn" id="btnRestart">เริ่มใหม่</button>
-      </div>
-    </div>
+let player = { x: 50, y: 300, w: 30, h: 30, dy: 0, onGround: true };
+let gravity = 0.8;
+let jumpPower = -12;
+let obstacles = [];
+let frame = 0;
+let speed = 5;
 
-    <!-- Overlays -->
-    <div class="center" id="overlayStart">
-      <div class="panel">
-        <h1>Square Runner</h1>
-        <p>วิ่งให้ไกลที่สุด! หลบสิ่งกีดขวางด้วย <span class="keyHint"><kbd>Space</kbd></span><span class="touchHint">ปุ่ม "กระโดด"</span></p>
-        <p>แตะ/คลิกเพื่อเริ่ม</p>
-      </div>
-    </div>
+function spawnObstacle() {
+  let height = 20 + Math.random() * 50; // ความสูงของสิ่งกีดขวางต่างกัน
+  let yPos = canvas.height - height - Math.random() * 50; // ความต่างระดับ
+  obstacles.push({
+    x: canvas.width,
+    y: yPos,
+    w: 20 + Math.random() * 30,
+    h: height
+  });
+}
 
-    <div class="center" id="overlayGameOver" style="display:none">
-      <div class="panel">
-        <h1>เกมจบ!</h1>
-        <p>คะแนนของคุณ: <strong id="finalScore">0</strong></p>
-        <p><span class="keyHint">กด <kbd>R</kbd> เพื่อเริ่มใหม่</span><span class="touchHint">กดปุ่ม "เริ่มใหม่"</span></p>
-      </div>
-    </div>
-  </div>
+function update() {
+  frame++;
+  if (frame % 90 === 0) {
+    spawnObstacle();
+  }
 
-  <script>
-    /*** Utility ***/
-    const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-    const rand=(a,b)=>Math.random()*(b-a)+a;
+  player.dy += gravity;
+  player.y += player.dy;
 
-    /*** Game setup ***/
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
+  if (player.y + player.h >= canvas.height) {
+    player.y = canvas.height - player.h;
+    player.dy = 0;
+    player.onGround = true;
+  }
 
-    // Resize canvas to container while keeping internal resolution crisp
-    const wrap = document.getElementById('wrap');
-    const fit = () => {
-      const { clientWidth:w, clientHeight:h } = wrap;
-      canvas.style.width = w+'px';
-      canvas.style.height = h+'px';
-    };
-    window.addEventListener('resize', fit); fit();
+  obstacles.forEach(ob => {
+    ob.x -= speed;
+  });
 
-    const overlayStart = document.getElementById('overlayStart');
-    const overlayGameOver = document.getElementById('overlayGameOver');
-    const scoreEl = document.getElementById('score');
-    const finalScoreEl = document.getElementById('finalScore');
-    const speedEl = document.getElementById('speed');
+  obstacles = obstacles.filter(ob => ob.x + ob.w > 0);
 
-    const btnJump = document.getElementById('btnJump');
-    const btnPause = document.getElementById('btnPause');
-    const btnRestart = document.getElementById('btnRestart');
-
-    const GROUND_Y = 520;   // world coordinate
-    const GRAVITY = 1800;   // px/s^2
-    const JUMP_VY = -800;   // px/s
-
-    let state = 'start'; // start | playing | paused | gameover
-
-    const player = {
-      x: 120, y: GROUND_Y, w: 36, h: 36,
-      vy: 0, onGround: true, trail: []
-    };
-
-    /*** Obstacles manager ***/
-    const obstacles = [];
-    let spawnTimer = 0;
-    let baseSpeed = 300; // px/s moves left
-    let distance = 0;
-    let score = 0;
-
-    function reset(){
-      state = 'start';
-      player.x = 120; player.y = GROUND_Y; player.vy=0; player.onGround=true; player.trail.length=0;
-      obstacles.length = 0; spawnTimer = 0; baseSpeed = 300; distance=0; score=0;
-      scoreEl.textContent = '0';
-      speedEl.textContent = '1.0x';
-      overlayStart.style.display='grid';
-      overlayGameOver.style.display='none';
+  // ตรวจการชน
+  obstacles.forEach(ob => {
+    if (
+      player.x < ob.x + ob.w &&
+      player.x + player.w > ob.x &&
+      player.y < ob.y + ob.h &&
+      player.y + player.h > ob.y
+    ) {
+      alert('Game Over!');
+      document.location.reload();
     }
+  });
+}
 
-    reset();
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    /*** Input ***/
-    function jump(){
-      if(state==='start'){ state='playing'; overlayStart.style.display='none'; }
-      if(state!=='playing') return;
-      if(player.onGround){ player.vy = JUMP_VY; player.onGround=false; }
-    }
-    function togglePause(){
-      if(state==='playing'){ state='paused'; btnPause.textContent='เล่นต่อ'; }
-      else if(state==='paused'){ state='playing'; btnPause.textContent='พัก'; last=performance.now(); loop(last); }
-    }
-    function restart(){ reset(); }
+  ctx.fillStyle = 'red';
+  ctx.fillRect(player.x, player.y, player.w, player.h);
 
-    btnJump.addEventListener('click', jump);
-    btnPause.addEventListener('click', togglePause);
-    btnRestart.addEventListener('click', restart);
+  ctx.fillStyle = 'green';
+  obstacles.forEach(ob => {
+    ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
+  });
+}
 
-    window.addEventListener('keydown', (e)=>{
-      if(e.code==='Space'){ e.preventDefault(); jump(); }
-      if(e.key==='p' || e.key==='P'){ togglePause(); }
-      if(e.key==='r' || e.key==='R'){ restart(); }
-    });
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
 
-    // Touch to start/jump
-    canvas.addEventListener('pointerdown', jump);
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && player.onGround) {
+    player.dy = jumpPower;
+    player.onGround = false;
+  }
+});
 
-    /*** Game loop ***/
-    let last = performance.now();
-    function loop(t){
-      const dt = Math.min(1/30, (t-last)/1000); // clamp big pauses
-      last = t;
-      if(state==='playing') update(dt);
-      draw();
-      if(state!=='paused') requestAnimationFrame(loop);
-    }
-    requestAnimationFrame(loop);
-
-    function update(dt){
-      // Increase difficulty over time
-      distance += baseSpeed * dt;
-      const difficulty = 1 + Math.min(1.5, distance/2500); // 1.0x to ~2.5x
-      const speed = baseSpeed * difficulty; // actual speed used for obstacles
-      speedEl.textContent = (difficulty).toFixed(1)+'x';
-
-      // Spawn obstacles
-      spawnTimer -= dt;
-      if(spawnTimer <= 0){
-        const height = Math.round(rand(28, 60));
-        const width = Math.round(rand(28, 60));
-        const gapY = GROUND_Y - height; // ground obstacle
-        obstacles.push({ x: canvas.width + 40, y: gapY, w: width, h: height, hue: rand(170, 290) });
-        spawnTimer = rand(0.8, 1.6) / difficulty;
-      }
-
-      // Update player physics
-      player.vy += GRAVITY * dt;
-      player.y += player.vy * dt;
-      if(player.y >= GROUND_Y){ player.y = GROUND_Y; player.vy=0; player.onGround=true; }
-
-      // Trail particles
-      player.trail.push({x:player.x+player.w/2, y:player.y+player.h/2, r: 6, life: .4});
-      for(let i=player.trail.length-1;i>=0;i--){
-        const p=player.trail[i]; p.life-=dt; p.r+=30*dt; if(p.life<=0) player.trail.splice(i,1);
-      }
-
-      // Move obstacles & check collision
-      for(let i=obstacles.length-1;i>=0;i--){
-        const o = obstacles[i]; o.x -= speed * dt;
-        if(o.x + o.w < -40){ obstacles.splice(i,1); continue; }
-        if(rectHit(player, o)) { gameOver(); break; }
-      }
-
-      // Score: time survived
-      score += dt * 10 * difficulty; // faster = more points
-      scoreEl.textContent = Math.floor(score);
-    }
-
-    function rectHit(a,b){
-      return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-    }
-
-    function gameOver(){
-      state='gameover';
-      overlayGameOver.style.display='grid';
-      finalScoreEl.textContent = Math.floor(score);
-    }
-
-    /*** Render ***/
-    function draw(){
-      // Clear
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-
-      // Parallax background
-      const t = performance.now()/1000;
-      drawStars(t);
-      drawGround();
-
-      // Obstacles
-      for(const o of obstacles){
-        ctx.fillStyle = `hsl(${o.hue},70%,55%)`;
-        roundRect(ctx, o.x, o.y, o.w, o.h, 8, true);
-        // accent outline
-        ctx.strokeStyle = `hsla(${o.hue},100%,85%,.5)`;
-        ctx.lineWidth = 2; ctx.stroke();
-      }
-
-      // Player trail
-      for(const p of player.trail){
-        ctx.fillStyle = `rgba(34,211,238,${p.life*0.6})`;
-        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
-      }
-
-      // Player
-      const pulse = 1 + Math.sin(t*6)*0.04;
-      ctx.fillStyle = '#22d3ee';
-      roundRect(ctx, player.x, player.y, player.w*pulse, player.h*pulse, 8, true);
-      ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth=2; ctx.stroke();
-
-      // Shadow
-      const sh = clamp(10 + (GROUND_Y - player.y)*0.06, 6, 22);
-      ctx.fillStyle='rgba(0,0,0,.35)';
-      ctx.beginPath(); ctx.ellipse(player.x+player.w/2, GROUND_Y+player.h-4, sh, sh*0.35, 0, 0, Math.PI*2); ctx.fill();
-    }
-
-    function drawGround(){
-      // ground line
-      ctx.strokeStyle = 'rgba(148,163,184,.35)';
-      ctx.lineWidth = 2; ctx.beginPath();
-      ctx.moveTo(0, GROUND_Y+player.h); ctx.lineTo(canvas.width, GROUND_Y+player.h); ctx.stroke();
-
-      // dotted parallax grid
-      const t = performance.now()/1000;
-      const speed = 60; // visual only
-      const off = (t*speed)%40;
-      ctx.fillStyle='rgba(148,163,184,.08)';
-      for(let x=-off; x<canvas.width; x+=40){
-        ctx.fillRect(x, GROUND_Y+player.h+6, 20, 3);
-      }
-    }
-
-    function drawStars(t){
-      const w = canvas.width, h = canvas.height;
-      // subtle moving nebula bands
-      for(let i=0;i<3;i++){
-        const y = Math.sin(t*0.1 + i)*40 + 120 + i*120;
-        const grad = ctx.createLinearGradient(0,y,w,y+200);
-        grad.addColorStop(0, 'rgba(167,139,250,0.03)');
-        grad.addColorStop(1, 'rgba(34,211,238,0.03)');
-        ctx.fillStyle = grad; ctx.fillRect(0, y, w, 200);
-      }
-      // twinkling stars
-      for(let i=0;i<80;i++){
-        const sx = (i*97 % w);
-        const sy = (i*53 % (GROUND_Y-120)) + 40;
-        const tw = (Math.sin(t*2 + i)*0.5+0.5);
-        ctx.fillStyle = `rgba(255,255,255,${0.15+tw*0.35})`;
-        ctx.fillRect(sx, sy, 2, 2);
-      }
-    }
-
-    function roundRect(ctx,x,y,w,h,r,fill){
-      ctx.beginPath();
-      ctx.moveTo(x+r, y);
-      ctx.arcTo(x+w, y, x+w, y+h, r);
-      ctx.arcTo(x+w, y+h, x, y+h, r);
-      ctx.arcTo(x, y+h, x, y, r);
-      ctx.arcTo(x, y, x+w, y, r);
-      if(fill) ctx.fill();
-    }
-  </script>
+gameLoop();
+</script>
 </body>
 </html>
